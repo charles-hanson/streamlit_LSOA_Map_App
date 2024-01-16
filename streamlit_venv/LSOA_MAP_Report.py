@@ -2,10 +2,51 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 
-# Function to read and process MAP file
+#Function to read and process BOY MAP file
 @st.cache_data()
-def process_map_file(map_file):
-    map_df = pd.read_excel(map_file)
+def process_boy_map_file(map_file):
+    if map_file.name.endswith('.csv'):
+        map_df = pd.read_csv(map_file, dtype=str)
+    elif map_file.name.endswith('.xlsx'):
+        map_df = pd.read_excel(map_file, engine='openpyxl')
+    else:
+        # Handle unsupported file types
+        st.sidebar.error("Unsupported file format for BOY Map Report. Please upload either CSV or XLSX.")
+        return None
+    map_df = map_df[["Student ID", "Subject"]]
+    map_df['Student ID'] = map_df['Student ID'].astype(str)
+    student_df = map_df.copy()
+    student_df = student_df[["Student ID"]]
+    student_df.drop_duplicates(subset=['Student ID'], inplace=True)
+    rla_df = map_df.copy()
+    rla_df = rla_df[rla_df["Subject"] == "Language Arts"]
+    rla_df.rename(columns={'Subject': 'BOY MAP RLA'}, inplace=True)
+    mth_df = map_df.copy()
+    mth_df = mth_df[mth_df["Subject"] == "Mathematics"]
+    mth_df.rename(columns={'Subject': 'BOY MAP MATH'}, inplace=True)
+    completion_df = student_df.merge(rla_df, how="left", on="Student ID")
+    completion_df = completion_df.merge(mth_df, how="left", on="Student ID")
+    completion_df['BOY MAP Completed'] = ""
+    completion_df.loc[completion_df['BOY MAP RLA'] == 'Language Arts', 'BOY MAP RLA'] = "Yes"
+    completion_df.loc[completion_df['BOY MAP RLA'] != 'Yes', 'BOY MAP RLA'] = "No"
+    completion_df.loc[completion_df['BOY MAP MATH'] == 'Mathematics', 'BOY MAP MATH'] = "Yes"
+    completion_df.loc[completion_df['BOY MAP MATH'] != 'Yes', 'BOY MAP MATH'] = "No"
+    completion_df.loc[
+        (completion_df['BOY MAP RLA'] == "Yes") & (completion_df['BOY MAP MATH'] == "Yes"), 'BOY MAP Completed'] = "Yes"
+    completion_df.loc[completion_df['BOY MAP MATH'] != 'Yes', 'BOY MAP Completed'] = "No"
+    return completion_df
+
+# Function to read and process MOY MAP file
+@st.cache_data()
+def process_moy_map_file(map_file):
+    if map_file.name.endswith('.csv'):
+        map_df = pd.read_csv(map_file, dtype=str)
+    elif map_file.name.endswith('.xlsx'):
+        map_df = pd.read_excel(map_file, engine='openpyxl')
+    else:
+        # Handle unsupported file types
+        st.sidebar.error("Unsupported file format for BOY Map Report. Please upload either CSV or XLSX.")
+        return None
     map_df = map_df[["Student ID", "Subject"]]
     map_df['Student ID'] = map_df['Student ID'].astype(str)
     student_df = map_df.copy()
@@ -32,7 +73,15 @@ def process_map_file(map_file):
 # Function to read and process Omni file
 @st.cache_data()
 def process_omni_file(omni_file):
-    omni_df = pd.read_csv(omni_file, dtype=str)
+    if omni_file.name.endswith('.csv'):
+        omni_df = pd.read_csv(omni_file, dtype=str)
+    elif map_file.name.endswith('.xlsx'):
+        omni_df = pd.read_excel(omni_file, engine='openpyxl')
+    else:
+        # Handle unsupported file types
+        st.sidebar.error("Unsupported file format for BOY Map Report. Please upload either CSV or XLSX.")
+        return None
+  
     omni_df = omni_df.loc[omni_df['SCHOOL'] == ("Lone Star Online Academy @ Roscoe")]
     omni_df['SCHOOLENROLLDATE'] = pd.to_datetime(omni_df['SCHOOLENROLLDATE']).dt.date
     today = date.today()
@@ -40,33 +89,41 @@ def process_omni_file(omni_file):
     omni_df = omni_df[["STUDENTID", "IDENTITYID", "SCHOOLENROLLDATE"]]
     return omni_df
 
-boy_df = pd.read_pickle("boy_df.pickle")
-boy_df["Student ID"] = boy_df["Student ID"].astype(str)
-tab1, tab2, tab3, tab4 = st.tabs(["MAP Upload", "Omni Report Upload", "Report Output", "Data Summary"])
+
+
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["BOY MAP Upload", "MOY MAP Upload", "Omni Report Upload", "Report Output", "Data Summary"])
 
 st.sidebar.header("LSOA Map Rollup Report Creator")
 
-# Upload MAP Report
-map_file = st.sidebar.file_uploader("Map Report file as Excel (.xlsx)", type=["xlsx"])
-if map_file:
-    completion_df = process_map_file(map_file)
-    tab1.dataframe(completion_df)
-    st.sidebar.success("MAP file successfully uploaded.")
+# Upload BOY MAP Report
+boy_map_file = st.sidebar.file_uploader("BOY Map Report file as Excel (.xlsx or .csv)", type=["xlsx", "csv"])
+if boy_map_file:
+    boy_df = process_boy_map_file(boy_map_file)
+    tab1.dataframe(boy_df)
+    st.sidebar.success("BOY MAP file successfully uploaded.")
+
+# Upload MOY MAP Report
+moy_map_file = st.sidebar.file_uploader("MOY Map Report file as Excel (.xlsx or .csv)", type=["xlsx", "csv"])
+if moy_map_file:
+    moy_df = process_moy_map_file(moy_map_file)
+    tab2.dataframe(moy_df)
+    st.sidebar.success("MOY MAP file successfully uploaded.")
 
 # Upload Omni Report
-omni_file = st.sidebar.file_uploader("Omni file as CSV (.csv)", type=["csv"])
+omni_file = st.sidebar.file_uploader("Omni file as CSV (.xlsx or .csv)", type=["xlsx", "csv"])
 if omni_file:
     omni_df = process_omni_file(omni_file)
-    tab2.dataframe(omni_df)
+    tab3.dataframe(omni_df)
     st.sidebar.success("Omni file successfully uploaded.")
 
 # Merge and Data Summary
 try:
-    if tab3.button("Merge"):
+    if tab4.button("Merge"):
         omni_df['STUDENTID'] = omni_df['STUDENTID'].astype(str)
-        merged_df = omni_df.merge(boy_df, how="left", left_on="STUDENTID", right_on="Student ID", indicator="_boy")
-        merged_df = merged_df.merge(completion_df, how="left", left_on="IDENTITYID", right_on="Student ID",
-                                    indicator="_merged")
+        omni_df['IDENTITYID'] = omni_df['IDENTITYID'].astype(str)
+        merged_df = omni_df.merge(boy_df, how="left", left_on="IDENTITYID", right_on="Student ID", indicator="_boy")
+        merged_df = merged_df.merge(moy_df, how="left", left_on="IDENTITYID", right_on="Student ID",
+                                    indicator="_moy")
         merged_df = merged_df[["STUDENTID", "BOY MAP RLA", "BOY MAP MATH", "BOY MAP Completed", "MOY MAP RLA",
                                "MOY MAP MATH", "MOY MAP Completed"]]
         merged_df.loc[(merged_df['BOY MAP Completed'] != "Yes") & (
@@ -76,12 +133,12 @@ try:
         merged_df.loc[merged_df['MOY MAP MATH'] == 'Mathematics', 'MOY MAP MATH'] = "Yes"
         merged_df.loc[merged_df['MOY MAP MATH'] != 'Yes', 'MOY MAP MATH'] = "No"
         merged_df.loc[
-            (merged_df['MOY MAP RLA'] == "Yes") & (completion_df['MOY MAP MATH'] == "Yes"), 'MOY MAP Completed'] = "Yes"
+            (merged_df['MOY MAP RLA'] == "Yes") & (moy_df['MOY MAP MATH'] == "Yes"), 'MOY MAP Completed'] = "Yes"
         merged_df.loc[merged_df['MOY MAP Completed'] != 'Yes', 'MOY MAP Completed'] = "No"
         merged_df["EOY MAP RLA"] = ""
         merged_df["EOY MAP MATH"] = ""
         merged_df["EOY MAP Completed"] = ""
-        tab3.dataframe(merged_df)
+        tab4.dataframe(merged_df)
         
         boy_yes= merged_df['BOY MAP Completed'].eq('Yes').sum()
         boy_no= merged_df['BOY MAP Completed'].eq('No').sum()
@@ -109,7 +166,7 @@ try:
         'MOY Map #': [moy_yes, moy_no, moy_na, moy_total],
         'MOY Map %': [moy_percent_yes, moy_percent_no, moy_percent_na, moy_percent_total],
         })
-        tab4.dataframe(metrics_df)
+        tab5.dataframe(metrics_df)
 
 except Exception as e:
     st.warning(f"Please upload both files above. Error: {e}")
