@@ -40,7 +40,7 @@ def process_omni_file(omni_file):
     omni_df = omni_df[["STUDENTID", "IDENTITYID", "SCHOOLENROLLDATE"]]
     return omni_df
 
-boy_df = pd.read_json("boy_json.json")
+boy_df = pd.read_pickle("boy_df.pickle")
 boy_df["Student ID"] = boy_df["Student ID"].astype(str)
 tab1, tab2, tab3, tab4 = st.tabs(["MAP Upload", "Omni Report Upload", "Report Output", "Data Summary"])
 
